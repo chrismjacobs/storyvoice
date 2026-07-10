@@ -70,25 +70,78 @@ def render_pdf_pages(pdf_bytes, dpi=150):
         doc.close()
 
 
+def _split_concatenated_mp4(data):
+    """iOS Safari's MediaRecorder can emit several independent, complete MP4 files
+    over one recording session (each with its own ftyp/moov/mdat) instead of one
+    continuous stream. The browser naively concatenates these into a single Blob,
+    but ffmpeg's demuxer only reads the first embedded file and silently drops the
+    rest. Split on every embedded ftyp box so each segment can be decoded on its own.
+    """
+    marker = b"ftyp"
+    starts = []
+    idx = data.find(marker)
+    while idx != -1:
+        starts.append(idx - 4)  # the 4-byte box size field precedes the type
+        idx = data.find(marker, idx + 1)
+
+    if len(starts) <= 1:
+        return [data]
+
+    boundaries = starts + [len(data)]
+    return [data[boundaries[i] : boundaries[i + 1]] for i in range(len(starts))]
+
+
 def transcode_to_mp3(input_bytes):
     """Transcode an arbitrary browser-recorded audio blob to MP3.
 
     Returns (mp3_bytes, duration_ms).
     """
     ffmpeg_path = imageio_ffmpeg.get_ffmpeg_exe()
-    with tempfile.TemporaryDirectory() as tmpdir:
-        in_path = Path(tmpdir) / "input.blob"
-        out_path = Path(tmpdir) / "output.mp3"
-        in_path.write_bytes(input_bytes)
+    is_mp4_like = input_bytes[4:8] == b"ftyp"
+    segments = _split_concatenated_mp4(input_bytes) if is_mp4_like else [input_bytes]
 
-        subprocess.run(
-            [ffmpeg_path, "-y", "-i", str(in_path), "-codec:a", "libmp3lame", "-qscale:a", "2", str(out_path)],
-            check=True,
-            capture_output=True,
-        )
+    with tempfile.TemporaryDirectory() as tmpdir:
+        out_path = Path(tmpdir) / "output.mp3"
+
+        if len(segments) == 1:
+            in_path = Path(tmpdir) / "input.blob"
+            in_path.write_bytes(segments[0])
+            _run_transcode(ffmpeg_path, in_path, out_path)
+        else:
+            wav_paths = []
+            for i, segment in enumerate(segments):
+                seg_path = Path(tmpdir) / f"segment{i}.blob"
+                seg_path.write_bytes(segment)
+                wav_path = Path(tmpdir) / f"segment{i}.wav"
+                subprocess.run(
+                    [ffmpeg_path, "-y", "-i", str(seg_path), str(wav_path)],
+                    check=True,
+                    capture_output=True,
+                )
+                wav_paths.append(wav_path)
+
+            concat_list = Path(tmpdir) / "concat.txt"
+            concat_list.write_text("".join(f"file '{p.name}'\n" for p in wav_paths))
+            subprocess.run(
+                [
+                    ffmpeg_path, "-y", "-f", "concat", "-safe", "0", "-i", str(concat_list),
+                    "-codec:a", "libmp3lame", "-qscale:a", "2", str(out_path),
+                ],
+                check=True,
+                capture_output=True,
+                cwd=tmpdir,
+            )
 
         duration_ms = _probe_duration_ms(ffmpeg_path, out_path)
         return out_path.read_bytes(), duration_ms
+
+
+def _run_transcode(ffmpeg_path, in_path, out_path):
+    subprocess.run(
+        [ffmpeg_path, "-y", "-i", str(in_path), "-codec:a", "libmp3lame", "-qscale:a", "2", str(out_path)],
+        check=True,
+        capture_output=True,
+    )
 
 
 def _probe_duration_ms(ffmpeg_path, path):
