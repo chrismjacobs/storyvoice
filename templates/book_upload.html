@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Upload book — Storyvoice{% endblock %}
+{% block content %}
+<div class="card">
+  <h1>Upload a book</h1>
+  <form method="post" enctype="multipart/form-data" onsubmit="return handleUploadSubmit(this);">
+    <label>Title
+      <input type="text" name="title" required autofocus>
+    </label>
+    <label>PDF file
+      <input type="file" name="pdf" accept="application/pdf" required>
+    </label>
+    <label>Language
+      <select name="language" required>
+        {% for value, label in language_choices %}
+          <option value="{{ value }}">{{ label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Age level
+      <select name="age_level" required>
+        {% for value, label in age_level_choices %}
+          <option value="{{ value }}">{{ label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <button type="submit">Upload &amp; render pages</button>
+    <p id="upload-status" class="stage-status" hidden>Uploading and rendering pages — this can take a little while for longer books. Don't click Upload again.</p>
+  </form>
+  <script>
+    function handleUploadSubmit(form) {
+      const button = form.querySelector("button[type=submit]");
+      button.disabled = true;
+      button.textContent = "Uploading…";
+      form.querySelector("#upload-status").hidden = false;
+      return true;
+    }
+  </script>
+</div>
+{% endblock %}

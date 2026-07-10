@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Books — Storyvoice{% endblock %}
+{% block content %}
+<h1>Books</h1>
+
+<form method="get" class="filter-bar">
+  <label>Language
+    <select name="language" onchange="this.form.submit()">
+      <option value="">All</option>
+      {% for value, label in language_choices %}
+        <option value="{{ value }}" {% if value == selected_language %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label>Age level
+    <select name="age_level" onchange="this.form.submit()">
+      <option value="">All</option>
+      {% for value, label in age_level_choices %}
+        <option value="{{ value }}" {% if value == selected_age_level %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  {% if selected_language or selected_age_level %}
+    <a href="{{ url_for('books.index') }}">Clear filters</a>
+  {% endif %}
+</form>
+
+{% if not books %}
+  <p>No books match these filters.
+    {% if current_user.is_admin %}<a href="{{ url_for('books.upload') }}">Upload one</a>.{% endif %}
+  </p>
+{% else %}
+  <div class="book-grid">
+    {% for book in books %}
+      <a class="book-card" href="{{ url_for('books.view', book_id=book.id) }}">
+        {% if thumbnails.get(book.id) %}
+          <img src="{{ thumbnails[book.id] }}" alt="{{ book.title }}">
+        {% else %}
+          <div class="book-card-placeholder"></div>
+        {% endif %}
+        <span class="book-card-title">{{ book.title }}</span>
+        <span class="book-card-meta">{{ book.page_count }} pages</span>
+        <span class="book-card-tags">
+          <span class="tag">{{ book.language_label() }}</span>
+          <span class="tag">{{ book.age_level_label() }}</span>
+        </span>
+      </a>
+    {% endfor %}
+  </div>
+{% endif %}
+{% endblock %}

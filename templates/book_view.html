@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}{{ book.title }} — Storyvoice{% endblock %}
+{% block content %}
+<h1>{{ book.title }}</h1>
+<p>
+  {{ book.page_count }} pages
+  <span class="tag">{{ book.language_label() }}</span>
+  <span class="tag">{{ book.age_level_label() }}</span>
+</p>
+
+{% if current_user.is_admin %}
+<form action="{{ url_for('books.delete', book_id=book.id) }}" method="post"
+      onsubmit="return confirm('Delete \'{{ book.title|e }}\' and all its narrations? This cannot be undone.');">
+  <button type="submit" class="danger-button">Delete this book</button>
+</form>
+{% endif %}
+
+<section>
+  <h2>Narrations</h2>
+  {% if not narration_data %}
+    <p>No narrations yet.</p>
+  {% else %}
+    <ul class="narration-list">
+      {% for entry in narration_data %}
+        {% set narration = entry.narration %}
+        <li class="narration-row">
+          <span>{{ narration.display_title() }}</span>
+          <span class="narration-progress">{{ entry.done }}/{{ entry.total }} pages</span>
+          <span class="narration-visibility">{{ narration.visibility }}</span>
+          <a href="{{ url_for('narrations.listen', narration_id=narration.id) }}">Listen</a>
+          {% if narration.user_id == current_user.id %}
+            <a href="{{ url_for('narrations.record', narration_id=narration.id) }}">Continue recording</a>
+          {% endif %}
+        </li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+</section>
+
+<section>
+  <h2>Start a new narration</h2>
+  <form action="{{ url_for('narrations.create', book_id=book.id) }}" method="post">
+    <label>Title (optional)
+      <input type="text" name="title" placeholder="e.g. Silly voices version">
+    </label>
+    <button type="submit">Start recording</button>
+  </form>
+</section>
+{% endblock %}

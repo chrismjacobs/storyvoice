@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Recording — {{ book.title }} — Storyvoice{% endblock %}
+
+{% block head %}
+<script>
+  window.MODEL_CANDIDATES = [
+    {% for m in model_candidates %}
+    { id: {{ m.id }}, label: {{ (m.display_title() ~ ' (' ~ m.progress()[0] ~ '/' ~ m.progress()[1] ~ ')')|tojson }} }{% if not loop.last %},{% endif %}
+    {% endfor %}
+  ];
+</script>
+<script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+<script src="{{ url_for('static', filename='js/recorder.js') }}" defer></script>
+{% endblock %}
+
+{% block content %}
+<div id="recorder-app">
+  <recorder-panel
+    :narration-id="{{ narration.id }}"
+    :page-count="{{ book.page_count }}"
+    book-title="{{ book.title|e }}"
+  ></recorder-panel>
+</div>
+{% endblock %}
