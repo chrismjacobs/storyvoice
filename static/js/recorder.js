@@ -1,5 +1,5 @@
 // Record panel: idle -> hearing_model -> countdown -> recording -> reviewing -> (keep|redo|silent) -> advance
-const { createApp, ref, computed, onMounted, onBeforeUnmount, watch } = Vue;
+const { createApp, ref, computed, onMounted, onBeforeUnmount, watch, nextTick } = Vue;
 
 const RecorderPanel = {
   props: {
@@ -55,6 +55,21 @@ const RecorderPanel = {
         <button :disabled="currentPageNumber <= 1" @click="goToPage(currentPageNumber - 1)">Previous</button>
         <button :disabled="currentPageNumber >= pageCount" @click="goToPage(currentPageNumber + 1)">Next</button>
       </div>
+
+      <div class="thumb-strip" ref="thumbStripEl">
+        <button
+          v-for="p in pages"
+          :key="p.page_number"
+          type="button"
+          class="thumb-item"
+          :class="[p.status, { active: p.page_number === currentPageNumber }]"
+          @click="goToPage(p.page_number)"
+        >
+          <img :src="p.image_url" :alt="'Page ' + p.page_number" loading="lazy">
+          <span class="thumb-status" :class="p.status"></span>
+          <span class="thumb-page-number">{{ p.page_number }}</span>
+        </button>
+      </div>
     </div>
   `,
   setup(props) {
@@ -69,6 +84,7 @@ const RecorderPanel = {
     const saving = ref(false);
     const errorMessage = ref("");
     const dwellDraft = ref(1);
+    const thumbStripEl = ref(null);
 
     let modelAudio = null;
     let mediaStream = null;
@@ -94,7 +110,15 @@ const RecorderPanel = {
     watch(modelId, loadData);
     watch(currentPageNumber, () => {
       if (currentPage.value) dwellDraft.value = currentPage.value.dwell_seconds;
+      scrollActiveThumbIntoView();
     });
+
+    function scrollActiveThumbIntoView() {
+      nextTick(() => {
+        const active = thumbStripEl.value && thumbStripEl.value.querySelector(".thumb-item.active");
+        if (active) active.scrollIntoView({ inline: "center", block: "nearest", behavior: "smooth" });
+      });
+    }
 
     function goToPage(n) {
       resetToIdle();
@@ -289,6 +313,7 @@ const RecorderPanel = {
       saveDwell,
       goToPage,
       stopRecordingNow,
+      thumbStripEl,
       pageCount: props.pageCount,
     };
   },

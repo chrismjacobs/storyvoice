@@ -1,5 +1,5 @@
 // Auto-play viewer: load page -> play audio (skip if silent) -> hold for dwell -> advance
-const { createApp, ref, computed, onMounted, onBeforeUnmount } = Vue;
+const { createApp, ref, computed, onMounted, onBeforeUnmount, watch, nextTick } = Vue;
 
 const ListenViewer = {
   props: {
@@ -22,6 +22,21 @@ const ListenViewer = {
         <button @click="togglePlay">{{ isPlaying ? 'Pause' : 'Play' }}</button>
         <button @click="skip" :disabled="currentIndex >= pages.length - 1">Skip</button>
       </div>
+
+      <div class="thumb-strip" ref="thumbStripEl">
+        <button
+          v-for="(p, idx) in pages"
+          :key="p.page_number"
+          type="button"
+          class="thumb-item"
+          :class="[p.status, { active: idx === currentIndex }]"
+          @click="jumpToPage(idx)"
+        >
+          <img :src="p.image_url" :alt="'Page ' + p.page_number" loading="lazy">
+          <span class="thumb-status" :class="p.status"></span>
+          <span class="thumb-page-number">{{ p.page_number }}</span>
+        </button>
+      </div>
     </div>
   `,
   setup(props) {
@@ -30,6 +45,7 @@ const ListenViewer = {
     const currentIndex = ref(0);
     const isPlaying = ref(false);
     const progress = ref(0);
+    const thumbStripEl = ref(null);
 
     let audioEl = null;
     let dwellStart = null;
@@ -89,6 +105,13 @@ const ListenViewer = {
       advance();
     }
 
+    function jumpToPage(idx) {
+      haltPlayback();
+      progress.value = 0;
+      currentIndex.value = idx;
+      if (isPlaying.value) runPage();
+    }
+
     function advance() {
       if (currentIndex.value < pages.value.length - 1) {
         currentIndex.value += 1;
@@ -137,10 +160,31 @@ const ListenViewer = {
       }, dwellDurationMs);
     }
 
+    function scrollActiveThumbIntoView() {
+      nextTick(() => {
+        const active = thumbStripEl.value && thumbStripEl.value.querySelector(".thumb-item.active");
+        if (active) active.scrollIntoView({ inline: "center", block: "nearest", behavior: "smooth" });
+      });
+    }
+
+    watch(currentIndex, scrollActiveThumbIntoView);
+
     onMounted(loadData);
     onBeforeUnmount(haltPlayback);
 
-    return { pages, title, currentIndex, currentPage, isPlaying, progress, togglePlay, goBack, skip };
+    return {
+      pages,
+      title,
+      currentIndex,
+      currentPage,
+      isPlaying,
+      progress,
+      togglePlay,
+      goBack,
+      skip,
+      jumpToPage,
+      thumbStripEl,
+    };
   },
 };
 
