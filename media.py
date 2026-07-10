@@ -91,14 +91,21 @@ def _split_concatenated_mp4(data):
     return [data[boundaries[i] : boundaries[i + 1]] for i in range(len(starts))]
 
 
-def transcode_to_mp3(input_bytes):
+def transcode_to_mp3(input_bytes, debug_context=""):
     """Transcode an arbitrary browser-recorded audio blob to MP3.
 
     Returns (mp3_bytes, duration_ms).
     """
+    logger = current_app.logger
     ffmpeg_path = imageio_ffmpeg.get_ffmpeg_exe()
     is_mp4_like = input_bytes[4:8] == b"ftyp"
     segments = _split_concatenated_mp4(input_bytes) if is_mp4_like else [input_bytes]
+
+    logger.info(
+        "[transcode %s] input_size=%d header=%s is_mp4_like=%s segments=%d segment_sizes=%s",
+        debug_context, len(input_bytes), input_bytes[:16].hex(), is_mp4_like,
+        len(segments), [len(s) for s in segments],
+    )
 
     with tempfile.TemporaryDirectory() as tmpdir:
         out_path = Path(tmpdir) / "output.mp3"
@@ -106,17 +113,29 @@ def transcode_to_mp3(input_bytes):
         if len(segments) == 1:
             in_path = Path(tmpdir) / "input.blob"
             in_path.write_bytes(segments[0])
-            _run_transcode(ffmpeg_path, in_path, out_path)
+            _run_transcode(ffmpeg_path, in_path, out_path, debug_context, logger)
         else:
             wav_paths = []
             for i, segment in enumerate(segments):
                 seg_path = Path(tmpdir) / f"segment{i}.blob"
                 seg_path.write_bytes(segment)
                 wav_path = Path(tmpdir) / f"segment{i}.wav"
-                subprocess.run(
-                    [ffmpeg_path, "-y", "-i", str(seg_path), str(wav_path)],
-                    check=True,
-                    capture_output=True,
+                try:
+                    result = subprocess.run(
+                        [ffmpeg_path, "-y", "-i", str(seg_path), str(wav_path)],
+                        check=True,
+                        capture_output=True,
+                    )
+                except subprocess.CalledProcessError as e:
+                    logger.warning(
+                        "[transcode %s] segment %d decode failed: %s",
+                        debug_context, i, e.stderr.decode(errors="replace"),
+                    )
+                    raise
+                seg_duration = _probe_duration_ms(ffmpeg_path, wav_path)
+                logger.info(
+                    "[transcode %s] segment %d decoded duration_ms=%s stderr_tail=%s",
+                    debug_context, i, seg_duration, result.stderr.decode(errors="replace")[-500:],
                 )
                 wav_paths.append(wav_path)
 
@@ -133,14 +152,27 @@ def transcode_to_mp3(input_bytes):
             )
 
         duration_ms = _probe_duration_ms(ffmpeg_path, out_path)
-        return out_path.read_bytes(), duration_ms
+        output_bytes = out_path.read_bytes()
+        logger.info(
+            "[transcode %s] final duration_ms=%s output_bytes=%d",
+            debug_context, duration_ms, len(output_bytes),
+        )
+        return output_bytes, duration_ms
 
 
-def _run_transcode(ffmpeg_path, in_path, out_path):
-    subprocess.run(
-        [ffmpeg_path, "-y", "-i", str(in_path), "-codec:a", "libmp3lame", "-qscale:a", "2", str(out_path)],
-        check=True,
-        capture_output=True,
+def _run_transcode(ffmpeg_path, in_path, out_path, debug_context, logger):
+    try:
+        result = subprocess.run(
+            [ffmpeg_path, "-y", "-i", str(in_path), "-codec:a", "libmp3lame", "-qscale:a", "2", str(out_path)],
+            check=True,
+            capture_output=True,
+        )
+    except subprocess.CalledProcessError as e:
+        logger.warning("[transcode %s] direct transcode failed: %s", debug_context, e.stderr.decode(errors="replace"))
+        raise
+    logger.info(
+        "[transcode %s] direct transcode stderr_tail=%s",
+        debug_context, result.stderr.decode(errors="replace")[-500:],
     )
 
 

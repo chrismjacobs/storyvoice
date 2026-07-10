@@ -99,7 +99,18 @@ def upload_clip(narration_id, page_number):
         abort(400)
 
     raw_bytes = audio_file.read()
-    mp3_bytes, duration_ms = media.transcode_to_mp3(raw_bytes)
+
+    # Temporary debug aid: keep the exact raw upload so odd device-specific
+    # recordings (e.g. iOS Safari) can be inspected after the fact. Overwritten
+    # on every take for a page, so this doesn't accumulate.
+    media.put_bytes(
+        f"narrations/{narration.id}/{page_number}.debug.raw",
+        raw_bytes,
+        audio_file.mimetype or "application/octet-stream",
+    )
+
+    debug_context = f"narration={narration.id} page={page_number} mimetype={audio_file.mimetype}"
+    mp3_bytes, duration_ms = media.transcode_to_mp3(raw_bytes, debug_context=debug_context)
     media.put_bytes(page.audio_object_key(), mp3_bytes, "audio/mpeg")
 
     page.status = "recorded"

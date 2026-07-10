@@ -240,11 +240,14 @@ button:disabled { background: var(--accent-dim); cursor: not-allowed; }
   opacity: 0.65;
 }
 
+.thumb-item.recorded { border-color: #3a9d4f; }
+.thumb-item.silent { border-color: #999; }
 .thumb-item.recorded img,
 .thumb-item.silent img { opacity: 1; }
 
 .thumb-item.active {
   border-color: var(--accent);
+  border-width: 3px;
 }
 
 .thumb-item.active img { opacity: 1; }

@@ -1,3 +1,5 @@
+import logging
+
 import click
 from flask import Flask, redirect, url_for
 from flask_login import LoginManager
@@ -14,6 +16,7 @@ login_manager.login_view = "auth.login"
 def create_app(config_class=Config):
     app = Flask(__name__)
     app.config.from_object(config_class)
+    app.logger.setLevel(logging.INFO)
 
     db.init_app(app)
     migrate.init_app(app, db)
