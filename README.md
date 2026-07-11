@@ -23,6 +23,9 @@ Requires a `.env` with `SECRET_KEY`, `DATABASE_URL`, `AWS_ACCESS_KEY_ID`, `AWS_S
 
 ## Deploy
 
-Docker image installs system `ffmpeg` (see `Dockerfile`) and runs `gunicorn app:app`.
+Docker image installs system `ffmpeg` (see `Dockerfile`) and runs `gunicorn app:app --timeout 300`.
+Book upload renders every page synchronously in the request (PyMuPDF -> Pillow -> WebP -> S3), which
+is fine for short kids' books but can take a while for a large phone-scanned PDF, hence the extended
+gunicorn timeout — Render's default 30s isn't enough for anything but a very short book.
 Use separate Render services for `production` and `staging`, each with its own `DATABASE_URL`
 and `S3_PREFIX` so media never crosses environments.
