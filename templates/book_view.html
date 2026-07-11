@@ -8,6 +8,13 @@
   <span class="tag">{{ book.age_level_label() }}</span>
 </p>
 
+<div class="stage-controls" style="justify-content: flex-start;">
+  <a class="btn" href="{{ url_for('books.pictures', book_id=book.id) }}">View as pictures</a>
+  {% if current_user.is_admin %}
+    <a class="btn" href="{{ url_for('books.edit', book_id=book.id) }}">Edit details</a>
+  {% endif %}
+</div>
+
 {% if current_user.is_admin %}
 <form action="{{ url_for('books.delete', book_id=book.id) }}" method="post"
       onsubmit="return confirm('Delete \'{{ book.title|e }}\' and all its narrations? This cannot be undone.');">
@@ -17,8 +24,25 @@
 
 <section>
   <h2>Narrations</h2>
+
+  {% if narrators|length > 1 %}
+    <form method="get" class="filter-bar">
+      <label>Narrated by
+        <select name="narrator_id" onchange="this.form.submit()">
+          <option value="">Everyone</option>
+          {% for narrator in narrators %}
+            <option value="{{ narrator.id }}" {% if narrator.id == selected_narrator_id %}selected{% endif %}>{{ narrator.display_name }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      {% if selected_narrator_id %}
+        <a href="{{ url_for('books.view', book_id=book.id) }}">Clear filter</a>
+      {% endif %}
+    </form>
+  {% endif %}
+
   {% if not narration_data %}
-    <p>No narrations yet.</p>
+    <p>No narrations{% if selected_narrator_id %} from that person{% endif %} yet.</p>
   {% else %}
     <ul class="narration-list">
       {% for entry in narration_data %}

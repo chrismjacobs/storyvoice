@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}{{ book.title }} — Pictures — Storyvoice{% endblock %}
+
+{% block head %}
+<script src="{{ url_for('static', filename='js/pictures.js') }}" defer></script>
+{% endblock %}
+
+{% block content %}
+<div class="stage" id="pictures-app" data-book-id="{{ book.id }}">
+  <h1>{{ book.title }}</h1>
+  <p class="stage-status" id="pictures-status">Loading pages…</p>
+
+  <img class="stage-image" id="pictures-image" src="" alt="" hidden>
+
+  <div class="stage-controls">
+    <button type="button" id="pictures-prev">Previous</button>
+    <button type="button" id="pictures-next">Next</button>
+  </div>
+
+  <div class="thumb-strip" id="pictures-thumbs"></div>
+</div>
+{% endblock %}

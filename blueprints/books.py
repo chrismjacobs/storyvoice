@@ -100,11 +100,68 @@ def _upload_form_choices():
 def view(book_id):
     book = Book.query.get_or_404(book_id)
     narrations = [n for n in book.narrations if n.is_visible_to(current_user)]
+
+    narrators = sorted({n.user for n in narrations}, key=lambda u: u.display_name)
+    narrator_id = request.args.get("narrator_id", type=int)
+    if narrator_id:
+        narrations = [n for n in narrations if n.user_id == narrator_id]
+
     narration_data = []
     for narration in narrations:
         done, total = narration.progress()
         narration_data.append({"narration": narration, "done": done, "total": total})
-    return render_template("book_view.html", book=book, narration_data=narration_data)
+
+    return render_template(
+        "book_view.html",
+        book=book,
+        narration_data=narration_data,
+        narrators=narrators,
+        selected_narrator_id=narrator_id,
+    )
+
+
+@books_bp.route("/<int:book_id>/edit", methods=["GET", "POST"])
+@login_required
+@admin_required
+def edit(book_id):
+    book = Book.query.get_or_404(book_id)
+
+    if request.method == "POST":
+        title = request.form.get("title", "").strip()
+        language = request.form.get("language", "")
+        age_level = request.form.get("age_level", "")
+
+        if not title or language not in Book.LANGUAGE_CHOICES or age_level not in Book.AGE_LEVEL_CHOICES:
+            flash("Title, language, and age level are all required.", "error")
+            return render_template("book_edit.html", book=book, **_upload_form_choices())
+
+        book.title = title
+        book.language = language
+        book.age_level = age_level
+        db.session.commit()
+
+        flash(f'"{book.title}" updated.', "success")
+        return redirect(url_for("books.view", book_id=book.id))
+
+    return render_template("book_edit.html", book=book, **_upload_form_choices())
+
+
+@books_bp.route("/<int:book_id>/pictures")
+@login_required
+def pictures(book_id):
+    book = Book.query.get_or_404(book_id)
+    return render_template("book_pictures.html", book=book)
+
+
+@books_bp.route("/<int:book_id>/pictures/data")
+@login_required
+def pictures_data(book_id):
+    book = Book.query.get_or_404(book_id)
+    pages = [
+        {"page_number": n, "image_url": media.presign_get(book.page_image_key(n))}
+        for n in range(1, book.page_count + 1)
+    ]
+    return jsonify({"title": book.title, "pages": pages})
 
 
 @books_bp.route("/<int:book_id>/delete", methods=["POST"])
