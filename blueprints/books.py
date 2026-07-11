@@ -4,7 +4,7 @@ from flask import Blueprint, abort, flash, jsonify, redirect, render_template, r
 from flask_login import current_user, login_required
 
 import media
-from models import Book, Narration, db
+from models import Book, Narration, User, db
 
 books_bp = Blueprint("books", __name__, url_prefix="/books")
 
@@ -25,6 +25,7 @@ def index():
     query = Book.query
     language = request.args.get("language") or ""
     age_level = request.args.get("age_level") or ""
+    narrator_id = request.args.get("narrator_id", type=int)
 
     if language in Book.LANGUAGE_CHOICES:
         query = query.filter_by(language=language)
@@ -32,6 +33,19 @@ def index():
         query = query.filter_by(age_level=age_level)
 
     books = query.order_by(Book.created_at.desc()).all()
+
+    # Narrator existence must respect visibility: a private narration shouldn't
+    # let other members discover (via the filter matching) that it exists at all.
+    visible_narrations_by_book = {
+        book.id: [n for n in book.narrations if n.is_visible_to(current_user)] for book in books
+    }
+
+    if narrator_id:
+        books = [book for book in books if any(n.user_id == narrator_id for n in visible_narrations_by_book[book.id])]
+
+    narrator_ids = {n.user_id for narrations in visible_narrations_by_book.values() for n in narrations}
+    narrators = User.query.filter(User.id.in_(narrator_ids)).order_by(User.display_name).all() if narrator_ids else []
+
     thumbnails = {book.id: media.presign_get(book.thumbnail_key) for book in books if book.thumbnail_key}
     return render_template(
         "books_index.html",
@@ -39,8 +53,10 @@ def index():
         thumbnails=thumbnails,
         language_choices=list(Book.LANGUAGE_LABELS.items()),
         age_level_choices=list(Book.AGE_LEVEL_LABELS.items()),
+        narrators=narrators,
         selected_language=language,
         selected_age_level=age_level,
+        selected_narrator_id=narrator_id,
     )
 
 

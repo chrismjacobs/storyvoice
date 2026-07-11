@@ -20,7 +20,17 @@
       {% endfor %}
     </select>
   </label>
-  {% if selected_language or selected_age_level %}
+  {% if narrators %}
+    <label>Narrated by
+      <select name="narrator_id" onchange="this.form.submit()">
+        <option value="">Anyone</option>
+        {% for narrator in narrators %}
+          <option value="{{ narrator.id }}" {% if narrator.id == selected_narrator_id %}selected{% endif %}>{{ narrator.display_name }}</option>
+        {% endfor %}
+      </select>
+    </label>
+  {% endif %}
+  {% if selected_language or selected_age_level or selected_narrator_id %}
     <a href="{{ url_for('books.index') }}">Clear filters</a>
   {% endif %}
 </form>
