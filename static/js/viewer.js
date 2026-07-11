@@ -47,13 +47,23 @@ const ListenViewer = {
     const progress = ref(0);
     const thumbStripEl = ref(null);
 
-    let audioEl = null;
-    let dwellStart = null;
-    let dwellDurationMs = 0;
-    let dwellFrame = null;
+    // iOS Safari only allows programmatic .play() on a <audio> element that has
+    // already played once inside a direct user gesture. Creating a fresh Audio()
+    // per page (as auto-advance does, from a timer/onended callback with no
+    // gesture in the call stack) gets silently blocked after the first page. A
+    // single element, reused for every page, stays "unlocked" for the session.
+    let sharedAudio = null;
+    let progressFrame = null;
     let dwellTimeout = null;
+    let phaseElapsedBeforeMs = 0; // ms already accounted for from prior phase(s) of this page
+    let totalDurationMs = 0;
 
     const currentPage = computed(() => pages.value[currentIndex.value] || null);
+
+    function getSharedAudio() {
+      if (!sharedAudio) sharedAudio = new Audio();
+      return sharedAudio;
+    }
 
     async function loadData() {
       const res = await fetch(`/narrations/${props.narrationId}/listen/data`);
@@ -63,23 +73,39 @@ const ListenViewer = {
     }
 
     function clearTimers() {
-      if (dwellFrame) cancelAnimationFrame(dwellFrame);
+      if (progressFrame) cancelAnimationFrame(progressFrame);
       if (dwellTimeout) clearTimeout(dwellTimeout);
-      dwellFrame = null;
+      progressFrame = null;
       dwellTimeout = null;
     }
 
     function stopAudio() {
-      if (audioEl) {
-        audioEl.pause();
-        audioEl.onended = null;
-        audioEl = null;
+      if (sharedAudio) {
+        sharedAudio.pause();
+        sharedAudio.onended = null;
       }
     }
 
     function haltPlayback() {
       clearTimers();
       stopAudio();
+    }
+
+    // Animates progress.value continuously across the whole page (speech +
+    // dwell) rather than resetting to 0 when dwell begins. phaseDurationMs is
+    // this phase's own length; phaseElapsedBeforeMs carries over time already
+    // spent in an earlier phase of the same page.
+    function tickProgress(phaseDurationMs) {
+      const phaseStart = performance.now();
+      function step(now) {
+        const phaseElapsed = Math.min(now - phaseStart, phaseDurationMs);
+        const totalElapsed = phaseElapsedBeforeMs + phaseElapsed;
+        progress.value = totalDurationMs > 0 ? Math.min(totalElapsed / totalDurationMs, 1) : 1;
+        if (phaseElapsed < phaseDurationMs) {
+          progressFrame = requestAnimationFrame(step);
+        }
+      }
+      progressFrame = requestAnimationFrame(step);
     }
 
     function togglePlay() {
@@ -124,40 +150,50 @@ const ListenViewer = {
     function runPage() {
       haltPlayback();
       progress.value = 0;
+      phaseElapsedBeforeMs = 0;
+
       const page = currentPage.value;
       if (!page) return;
 
-      if (page.status === "recorded" && page.audio_url) {
-        audioEl = new Audio(page.audio_url);
-        audioEl.onended = () => runDwell(page);
-        audioEl.play();
+      const hasAudio = page.status === "recorded" && Boolean(page.audio_url);
+      const audioMs = hasAudio ? Math.max(page.duration_ms || 0, 0) : 0;
+      const dwellMs = Math.max(page.dwell_seconds, 0) * 1000;
+      totalDurationMs = audioMs + dwellMs;
+
+      if (hasAudio) {
+        const audio = getSharedAudio();
+        audio.src = page.audio_url;
+        audio.onended = () => {
+          if (progressFrame) cancelAnimationFrame(progressFrame);
+          phaseElapsedBeforeMs = audioMs;
+          runDwell(dwellMs);
+        };
+        audio.play().catch(() => {
+          // Playback can still be blocked in some browsers/states outside a
+          // gesture; skip straight to dwell so auto-advance keeps moving
+          // rather than getting stuck silently.
+          if (progressFrame) cancelAnimationFrame(progressFrame);
+          phaseElapsedBeforeMs = audioMs;
+          runDwell(dwellMs);
+        });
+        tickProgress(audioMs || 1);
       } else {
-        runDwell(page);
+        runDwell(dwellMs);
       }
     }
 
-    function runDwell(page) {
-      dwellDurationMs = Math.max(page.dwell_seconds, 0) * 1000;
-      dwellStart = performance.now();
-
-      if (dwellDurationMs === 0) {
+    function runDwell(dwellMs) {
+      if (dwellMs === 0) {
         progress.value = 1;
         advance();
         return;
       }
 
-      function step(now) {
-        const elapsed = now - dwellStart;
-        progress.value = Math.min(elapsed / dwellDurationMs, 1);
-        if (elapsed < dwellDurationMs) {
-          dwellFrame = requestAnimationFrame(step);
-        }
-      }
-      dwellFrame = requestAnimationFrame(step);
+      tickProgress(dwellMs);
       dwellTimeout = setTimeout(() => {
         progress.value = 1;
         advance();
-      }, dwellDurationMs);
+      }, dwellMs);
     }
 
     function scrollActiveThumbIntoView() {
