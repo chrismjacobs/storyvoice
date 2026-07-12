@@ -4,11 +4,11 @@
 <div class="card">
   <h1>Upload a book</h1>
   <form method="post" enctype="multipart/form-data" onsubmit="return handleUploadSubmit(this);">
-    <label>Title
-      <input type="text" name="title" required autofocus>
-    </label>
     <label>PDF file
-      <input type="file" name="pdf" accept="application/pdf" required>
+      <input type="file" name="pdf" accept="application/pdf" required autofocus>
+    </label>
+    <label>Title (optional — defaults to the file name)
+      <input type="text" name="title" placeholder="e.g. Anzu the Great Kaiju">
     </label>
     <label>Language
       <select name="language" required>

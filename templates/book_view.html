@@ -1,7 +1,24 @@
 {% extends "base.html" %}
 {% block title %}{{ book.title }} — Storyvoice{% endblock %}
 {% block content %}
-<h1>{{ book.title }}</h1>
+<div class="book-header">
+  <h1>{{ book.title }}</h1>
+  {% if current_user.is_admin %}
+    <form action="{{ url_for('books.delete', book_id=book.id) }}" method="post"
+          onsubmit="return confirm('Delete \'{{ book.title|e }}\' and all its narrations? This cannot be undone.');">
+      <button type="submit" class="icon-button danger" title="Delete this book" aria-label="Delete this book">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="3 6 5 6 21 6"></polyline>
+          <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path>
+          <path d="M10 11v6"></path>
+          <path d="M14 11v6"></path>
+          <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"></path>
+        </svg>
+      </button>
+    </form>
+  {% endif %}
+</div>
+
 <p>
   {{ book.page_count }} pages
   <span class="tag">{{ book.language_label() }}</span>
@@ -14,13 +31,6 @@
     <a class="btn" href="{{ url_for('books.edit', book_id=book.id) }}">Edit details</a>
   {% endif %}
 </div>
-
-{% if current_user.is_admin %}
-<form action="{{ url_for('books.delete', book_id=book.id) }}" method="post"
-      onsubmit="return confirm('Delete \'{{ book.title|e }}\' and all its narrations? This cannot be undone.');">
-  <button type="submit" class="danger-button">Delete this book</button>
-</form>
-{% endif %}
 
 <section>
   <h2>Narrations</h2>

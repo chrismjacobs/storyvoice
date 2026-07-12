@@ -1,4 +1,6 @@
+import re
 from functools import wraps
+from pathlib import Path
 
 from flask import Blueprint, abort, flash, jsonify, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
@@ -71,14 +73,16 @@ def upload():
         age_level = request.form.get("age_level", "")
 
         if (
-            not title
-            or not pdf_file
+            not pdf_file
             or pdf_file.filename == ""
             or language not in Book.LANGUAGE_CHOICES
             or age_level not in Book.AGE_LEVEL_CHOICES
         ):
-            flash("Title, a PDF file, language, and age level are all required.", "error")
+            flash("A PDF file, language, and age level are all required.", "error")
             return render_template("book_upload.html", **_upload_form_choices())
+
+        if not title:
+            title = _title_from_filename(pdf_file.filename)
 
         pdf_bytes = pdf_file.read()
 
@@ -109,6 +113,13 @@ def _upload_form_choices():
         "language_choices": list(Book.LANGUAGE_LABELS.items()),
         "age_level_choices": list(Book.AGE_LEVEL_LABELS.items()),
     }
+
+
+def _title_from_filename(filename):
+    stem = Path(filename).stem
+    stem = re.sub(r"[_-]+", " ", stem)
+    stem = re.sub(r"\s+", " ", stem).strip()
+    return stem or "Untitled"
 
 
 @books_bp.route("/<int:book_id>")
