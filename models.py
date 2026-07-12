@@ -39,6 +39,24 @@ class Book(db.Model):
     AGE_LEVEL_CHOICES = ("under_5", "5_7", "7_plus")
     AGE_LEVEL_LABELS = {"under_5": "Under 5", "5_7": "5-7", "7_plus": "7+"}
 
+    # Curated theme palette: auto-detection snaps a page's dominant color to the
+    # nearest of these rather than using raw extracted RGB, so every book gets a
+    # color that's legible (white button text on "base") and on-brand, never an
+    # accidental muddy/low-contrast pairing. "coral" matches the app's original
+    # default accent, so untouched books look unchanged.
+    THEME_SWATCHES = {
+        "coral": {"base": "#d9622b", "dim": "#f0b28a"},
+        "teal": {"base": "#1f7a7a", "dim": "#a3d9d9"},
+        "blueberry": {"base": "#3b5bdb", "dim": "#b8c6f7"},
+        "grape": {"base": "#7c3aed", "dim": "#d6c2fb"},
+        "leaf": {"base": "#2f9e44", "dim": "#b7e4c7"},
+        "amber": {"base": "#b8860b", "dim": "#f0d9a6"},
+        "raspberry": {"base": "#c2255c", "dim": "#f5c2d9"},
+        "slate": {"base": "#495464", "dim": "#cbd2da"},
+        "chestnut": {"base": "#8a5a34", "dim": "#dcc3a4"},
+    }
+    THEME_CHOICES = tuple(THEME_SWATCHES.keys())
+
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(255), nullable=False)
     page_count = db.Column(db.Integer, nullable=False, default=0)
@@ -46,6 +64,7 @@ class Book(db.Model):
     original_pdf_key = db.Column(db.String(500))
     language = db.Column(db.String(20), nullable=False, default="english")
     age_level = db.Column(db.String(20), nullable=False, default="5_7")
+    theme_color = db.Column(db.String(20), nullable=False, default="coral")
     uploaded_by = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
     created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=utcnow)
 
@@ -60,6 +79,12 @@ class Book(db.Model):
 
     def age_level_label(self):
         return self.AGE_LEVEL_LABELS[self.age_level]
+
+    def theme_base(self):
+        return self.THEME_SWATCHES[self.theme_color]["base"]
+
+    def theme_dim(self):
+        return self.THEME_SWATCHES[self.theme_color]["dim"]
 
 
 class Narration(db.Model):

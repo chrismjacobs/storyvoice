@@ -23,7 +23,7 @@
     {% endif %}
   </header>
 
-  <main class="site-main">
+  <main class="site-main" style="{% block main_style %}{% endblock %}">
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% if messages %}
         <ul class="flashes">

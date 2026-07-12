@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block title %}{{ book.title }} — Storyvoice{% endblock %}
+{% block main_style %}--accent: {{ book.theme_base() }}; --accent-dim: {{ book.theme_dim() }};{% endblock %}
 {% block content %}
 <div class="book-header">
   <h1>{{ book.title }}</h1>

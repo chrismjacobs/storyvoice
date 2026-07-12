@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Edit {{ book.title }} — Storyvoice{% endblock %}
+{% block main_style %}--accent: {{ book.theme_base() }}; --accent-dim: {{ book.theme_dim() }};{% endblock %}
 {% block content %}
 <div class="card">
   <h1>Edit book details</h1>
@@ -21,6 +22,16 @@
         {% endfor %}
       </select>
     </label>
+
+    <fieldset class="swatch-picker">
+      <legend>Color theme</legend>
+      {% for key, colors in theme_choices %}
+        <label class="swatch" style="background: {{ colors.base }};">
+          <input type="radio" name="theme_color" value="{{ key }}" {% if key == book.theme_color %}checked{% endif %}>
+        </label>
+      {% endfor %}
+    </fieldset>
+
     <button type="submit">Save changes</button>
     <a href="{{ url_for('books.view', book_id=book.id) }}">Cancel</a>
   </form>

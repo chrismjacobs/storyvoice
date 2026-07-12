@@ -93,13 +93,18 @@ def upload():
         media.put_bytes(f"books/{book.id}/original.pdf", pdf_bytes, "application/pdf")
 
         page_count = 0
+        first_page_bytes = None
         for page_number, webp_bytes in media.render_pdf_pages(pdf_bytes):
             media.put_bytes(book.page_image_key(page_number), webp_bytes, "image/webp")
+            if page_number == 1:
+                first_page_bytes = webp_bytes
             page_count += 1
 
         book.page_count = page_count
         book.original_pdf_key = f"books/{book.id}/original.pdf"
         book.thumbnail_key = book.page_image_key(1) if page_count else None
+        if first_page_bytes:
+            book.theme_color = media.detect_theme_color(first_page_bytes)
         db.session.commit()
 
         flash(f'"{book.title}" uploaded with {page_count} pages.', "success")
@@ -112,6 +117,7 @@ def _upload_form_choices():
     return {
         "language_choices": list(Book.LANGUAGE_LABELS.items()),
         "age_level_choices": list(Book.AGE_LEVEL_LABELS.items()),
+        "theme_choices": list(Book.THEME_SWATCHES.items()),
     }
 
 
@@ -157,14 +163,21 @@ def edit(book_id):
         title = request.form.get("title", "").strip()
         language = request.form.get("language", "")
         age_level = request.form.get("age_level", "")
+        theme_color = request.form.get("theme_color", "")
 
-        if not title or language not in Book.LANGUAGE_CHOICES or age_level not in Book.AGE_LEVEL_CHOICES:
-            flash("Title, language, and age level are all required.", "error")
+        if (
+            not title
+            or language not in Book.LANGUAGE_CHOICES
+            or age_level not in Book.AGE_LEVEL_CHOICES
+            or theme_color not in Book.THEME_CHOICES
+        ):
+            flash("Title, language, age level, and color theme are all required.", "error")
             return render_template("book_edit.html", book=book, **_upload_form_choices())
 
         book.title = title
         book.language = language
         book.age_level = age_level
+        book.theme_color = theme_color
         db.session.commit()
 
         flash(f'"{book.title}" updated.', "success")

@@ -1,3 +1,4 @@
+import colorsys
 import io
 import subprocess
 import tempfile
@@ -8,6 +9,8 @@ import fitz  # PyMuPDF
 import imageio_ffmpeg
 from flask import current_app
 from PIL import Image
+
+from models import Book
 
 
 def _s3_client():
@@ -68,6 +71,67 @@ def render_pdf_pages(pdf_bytes, dpi=150):
             yield index + 1, buffer.getvalue()
     finally:
         doc.close()
+
+
+def detect_theme_color(image_bytes):
+    """Pick the nearest Book.THEME_SWATCHES key to an image's dominant color.
+
+    Quantizes down to a handful of color clusters, drops the paper background
+    (near-white/near-black/gray) and any tiny/noise clusters, then picks the
+    most *saturated* of what's left. Frequency alone tends to pick cartoon
+    outline/linework strokes -- often a saturated brown -- over the actual
+    character/artwork color a human would call "the cover's color".
+    """
+    image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+    image = image.resize((80, 80))
+    quantized = image.quantize(colors=6, method=Image.MEDIANCUT)
+    palette = quantized.getpalette()
+    clusters = quantized.getcolors()  # (count, palette_index)
+    total_pixels = sum(count for count, _ in clusters)
+
+    def cluster_rgb(index):
+        return tuple(palette[index * 3 : index * 3 + 3])
+
+    def saturation(rgb):
+        r, g, b = rgb
+        return 0 if max(r, g, b) == 0 else (max(r, g, b) - min(r, g, b)) / max(r, g, b)
+
+    def is_muted(rgb):
+        s = saturation(rgb)
+        brightness = max(rgb) / 255
+        near_white = brightness > 0.92 and s < 0.35  # a pale pastel, not a vivid bright color
+        near_black = brightness < 0.12
+        grayish = s < 0.15
+        return near_white or near_black or grayish
+
+    significant = [cluster_rgb(idx) for count, idx in clusters if count / total_pixels > 0.05]
+    vivid = [rgb for rgb in significant if not is_muted(rgb)]
+
+    if not vivid:
+        return "coral"  # no clear color signal in the page; keep the app's original default
+
+    dominant = max(vivid, key=saturation)
+    return _nearest_theme_key(dominant)
+
+
+def _nearest_theme_key(rgb):
+    # Hue is the primary signal (separates red/green/blue/purple families), but
+    # brown sits at nearly the same hue as orange/coral -- it's really just a
+    # dark, muted orange. Folding brightness into the distance lets a dedicated
+    # "chestnut" swatch win for dark earthy tones (fur, wood, dirt) while bright
+    # vivid oranges still land on "coral".
+    target_hue, _, target_value = colorsys.rgb_to_hsv(*(c / 255 for c in rgb))
+
+    def distance(key):
+        base_hex = Book.THEME_SWATCHES[key]["base"]
+        base_rgb = tuple(int(base_hex[i : i + 2], 16) / 255 for i in (1, 3, 5))
+        base_hue, _, base_value = colorsys.rgb_to_hsv(*base_rgb)
+        hue_diff = abs(target_hue - base_hue)
+        hue_diff = min(hue_diff, 1 - hue_diff)
+        value_diff = abs(target_value - base_value)
+        return hue_diff * 1.5 + value_diff * 0.5
+
+    return min(Book.THEME_CHOICES, key=distance)
 
 
 def _split_concatenated_mp4(data):
