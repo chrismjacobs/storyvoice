@@ -18,6 +18,10 @@
     <button type="button" id="pictures-prev">Previous</button>
     <button type="button" id="pictures-expand">Expand</button>
     <button type="button" id="pictures-next">Next</button>
+    {% if current_user.is_admin %}
+    <button type="button" id="pictures-rotate-ccw" title="Rotate page left">⟲</button>
+    <button type="button" id="pictures-rotate-cw" title="Rotate page right">⟳</button>
+    {% endif %}
   </div>
 
   <div class="thumb-strip" id="pictures-thumbs"></div>

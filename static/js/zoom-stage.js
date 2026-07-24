@@ -9,6 +9,7 @@
   const DOUBLE_TAP_SCALE = 2.5;
   const DOUBLE_TAP_MS = 300;
   const TAP_MOVE_TOLERANCE = 10;
+  const SWIPE_THRESHOLD = 50;
 
   let overlay, imgWrap, imgEl, closeBtn, prevBtn, nextBtn, bottomBar, playBtn, progressTrack, progressFill;
 
@@ -134,15 +135,28 @@
       panStart = { x: remaining.x, y: remaining.y, tx, ty };
     } else if (pointers.size === 0) {
       panStart = null;
-      if (scale < 1.02) {
+      // Only fit-to-screen was allowed to pan (see onPointerMove), so a swipe
+      // is only recognized when we weren't zoomed in -- otherwise a drag pans
+      // the image instead of turning the page, which is what a photo-viewer
+      // user expects.
+      const wasZoomed = scale > 1.02;
+      if (!wasZoomed) {
         resetZoom(true);
       } else {
         clampTranslate();
         applyTransform();
       }
 
-      const moved = p ? Math.hypot(p.x - p.downX, p.y - p.downY) : Infinity;
-      if (!hadMultiTouch && p && moved < TAP_MOVE_TOLERANCE) {
+      const dx = p ? p.x - p.downX : 0;
+      const dy = p ? p.y - p.downY : 0;
+      const moved = Math.hypot(dx, dy);
+
+      if (!hadMultiTouch && p && !wasZoomed && Math.abs(dx) > SWIPE_THRESHOLD && Math.abs(dx) > Math.abs(dy) * 1.5) {
+        if (dx < 0) currentOpts && currentOpts.onNext && currentOpts.onNext();
+        else currentOpts && currentOpts.onPrev && currentOpts.onPrev();
+        lastTapTime = 0;
+        lastTapPos = null;
+      } else if (!hadMultiTouch && p && moved < TAP_MOVE_TOLERANCE) {
         const now = Date.now();
         const tapPos = { x: p.x, y: p.y };
         const withinTime = now - lastTapTime < DOUBLE_TAP_MS;
@@ -234,6 +248,17 @@
     imgEl.addEventListener("pointercancel", onPointerUp);
   }
 
+  function syncAccentColor() {
+    // The overlay is appended to <body>, outside the <main> element that
+    // carries the per-book --accent custom property inline, so it wouldn't
+    // otherwise inherit the book's theme and the progress bar would fall
+    // back to the default orange. Copy the current value onto the overlay.
+    const mainEl = document.querySelector(".site-main");
+    if (!mainEl) return;
+    const accent = getComputedStyle(mainEl).getPropertyValue("--accent").trim();
+    if (accent) overlay.style.setProperty("--accent", accent);
+  }
+
   function syncNavState() {
     prevBtn.disabled = !currentOpts.hasPrev;
     nextBtn.disabled = !currentOpts.hasNext;
@@ -249,6 +274,7 @@
     if (!overlay) build();
     currentOpts = opts;
 
+    syncAccentColor();
     setImage(opts.imageUrl, opts.alt);
     syncNavState();
 

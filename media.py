@@ -35,6 +35,11 @@ def put_bytes(key, data, content_type):
     )
 
 
+def get_bytes(key):
+    obj = _s3_client().get_object(Bucket=current_app.config["S3_BUCKET"], Key=_prefixed(key))
+    return obj["Body"].read()
+
+
 def delete_objects(keys):
     """Delete up to 1000 keys in a single batch call. No-op for an empty list."""
     if not keys:
@@ -71,6 +76,22 @@ def render_pdf_pages(pdf_bytes, dpi=150):
             yield index + 1, buffer.getvalue()
     finally:
         doc.close()
+
+
+def rotate_image(image_bytes, clockwise):
+    """Rotate a page image 90 degrees and re-encode as webp.
+
+    Scanned pages sometimes come out landscape when the rest of the book is
+    portrait (or vice versa); this physically rotates the stored pixels
+    rather than applying a CSS transform, so every consumer (viewer,
+    thumbnail, listen mode) picks up the corrected orientation for free.
+    """
+    image = Image.open(io.BytesIO(image_bytes))
+    angle = -90 if clockwise else 90  # PIL rotates counter-clockwise for positive angles
+    rotated = image.rotate(angle, expand=True)
+    buffer = io.BytesIO()
+    rotated.save(buffer, format="WEBP", quality=85)
+    return buffer.getvalue()
 
 
 def detect_theme_color(image_bytes):

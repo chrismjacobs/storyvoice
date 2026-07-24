@@ -234,3 +234,21 @@ def page_image_url(book_id, page_number):
     if page_number < 1 or page_number > book.page_count:
         abort(404)
     return jsonify({"url": media.presign_get(book.page_image_key(page_number))})
+
+
+@books_bp.route("/<int:book_id>/pages/<int:page_number>/rotate", methods=["POST"])
+@login_required
+@admin_required
+def rotate_page(book_id, page_number):
+    book = Book.query.get_or_404(book_id)
+    if page_number < 1 or page_number > book.page_count:
+        abort(404)
+
+    payload = request.get_json(silent=True) or {}
+    clockwise = payload.get("direction", "cw") != "ccw"
+
+    key = book.page_image_key(page_number)
+    rotated_bytes = media.rotate_image(media.get_bytes(key), clockwise)
+    media.put_bytes(key, rotated_bytes, "image/webp")
+
+    return jsonify({"url": media.presign_get(key)})

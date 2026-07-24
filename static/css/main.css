@@ -312,6 +312,8 @@ button:disabled { background: var(--accent-dim); cursor: not-allowed; }
   padding: 0 4.5rem 0 0.75rem;
 }
 
+.immersive-bottom-bar[hidden] { display: none; }
+
 .immersive-progress-track {
   flex: 1;
   max-width: none;

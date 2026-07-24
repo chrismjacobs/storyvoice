@@ -10,6 +10,8 @@ document.addEventListener("DOMContentLoaded", () => {
   const prevBtn = document.getElementById("pictures-prev");
   const nextBtn = document.getElementById("pictures-next");
   const expandBtn = document.getElementById("pictures-expand");
+  const rotateCcwBtn = document.getElementById("pictures-rotate-ccw");
+  const rotateCwBtn = document.getElementById("pictures-rotate-cw");
   const thumbsEl = document.getElementById("pictures-thumbs");
 
   let pages = [];
@@ -62,6 +64,34 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  function rotate(direction) {
+    const page = pages[currentIndex];
+    if (!page) return;
+
+    if (rotateCcwBtn) rotateCcwBtn.disabled = true;
+    if (rotateCwBtn) rotateCwBtn.disabled = true;
+
+    fetch(`/books/${bookId}/pages/${page.page_number}/rotate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ direction }),
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        page.image_url = data.url;
+        const thumbImg = thumbsEl.children[currentIndex] && thumbsEl.children[currentIndex].querySelector("img");
+        if (thumbImg) thumbImg.src = data.url;
+        render();
+      })
+      .catch(() => {
+        statusEl.textContent = "Could not rotate this page — try again.";
+      })
+      .finally(() => {
+        if (rotateCcwBtn) rotateCcwBtn.disabled = false;
+        if (rotateCwBtn) rotateCwBtn.disabled = false;
+      });
+  }
+
   function buildThumbs() {
     thumbsEl.innerHTML = "";
     pages.forEach((page, idx) => {
@@ -89,6 +119,8 @@ document.addEventListener("DOMContentLoaded", () => {
   nextBtn.addEventListener("click", () => goTo(currentIndex + 1));
   expandBtn.addEventListener("click", openExpanded);
   imageEl.addEventListener("click", openExpanded);
+  if (rotateCcwBtn) rotateCcwBtn.addEventListener("click", () => rotate("ccw"));
+  if (rotateCwBtn) rotateCwBtn.addEventListener("click", () => rotate("cw"));
 
   fetch(`/books/${bookId}/pictures/data`)
     .then((res) => res.json())
