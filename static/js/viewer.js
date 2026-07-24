@@ -11,7 +11,7 @@ const ListenViewer = {
       <h1>{{ bookTitle }}</h1>
       <p class="stage-status">{{ title }} — Page {{ currentIndex + 1 }} of {{ pages.length }}</p>
 
-      <img v-if="currentPage" class="stage-image" :src="currentPage.image_url" :alt="'Page ' + (currentIndex + 1)">
+      <img v-if="currentPage" class="stage-image" :src="currentPage.image_url" :alt="'Page ' + (currentIndex + 1)" @click="openExpanded">
 
       <div class="progress-track">
         <div class="progress-fill" :style="{ width: (progress * 100) + '%' }"></div>
@@ -21,6 +21,7 @@ const ListenViewer = {
         <button @click="goBack" :disabled="currentIndex === 0">Back</button>
         <button @click="togglePlay">{{ isPlaying ? 'Pause' : 'Play' }}</button>
         <button @click="skip" :disabled="currentIndex >= pages.length - 1">Skip</button>
+        <button @click="openExpanded">Expand</button>
       </div>
 
       <div class="thumb-strip" ref="thumbStripEl">
@@ -203,7 +204,47 @@ const ListenViewer = {
       });
     }
 
-    watch(currentIndex, scrollActiveThumbIntoView);
+    function syncExpandedPage() {
+      const stage = window.StoryvoiceZoomStage;
+      if (!stage || !stage.isOpen()) return;
+      const page = currentPage.value;
+      if (!page) return;
+      stage.update({
+        imageUrl: page.image_url,
+        alt: "Page " + (currentIndex.value + 1),
+        hasPrev: currentIndex.value > 0,
+        hasNext: currentIndex.value < pages.value.length - 1,
+      });
+    }
+
+    function openExpanded() {
+      const stage = window.StoryvoiceZoomStage;
+      if (!stage || !currentPage.value) return;
+      stage.open({
+        imageUrl: currentPage.value.image_url,
+        alt: "Page " + (currentIndex.value + 1),
+        hasPrev: currentIndex.value > 0,
+        hasNext: currentIndex.value < pages.value.length - 1,
+        controls: "nav-audio",
+        isPlaying: isPlaying.value,
+        onPrev: goBack,
+        onNext: skip,
+        onTogglePlay: togglePlay,
+      });
+    }
+
+    watch(currentIndex, () => {
+      scrollActiveThumbIntoView();
+      syncExpandedPage();
+    });
+    watch(progress, (v) => {
+      const stage = window.StoryvoiceZoomStage;
+      if (stage && stage.isOpen()) stage.setProgress(v);
+    });
+    watch(isPlaying, (v) => {
+      const stage = window.StoryvoiceZoomStage;
+      if (stage && stage.isOpen()) stage.setPlaying(v);
+    });
 
     onMounted(loadData);
     onBeforeUnmount(haltPlayback);
@@ -220,6 +261,7 @@ const ListenViewer = {
       skip,
       jumpToPage,
       thumbStripEl,
+      openExpanded,
     };
   },
 };

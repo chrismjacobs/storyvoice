@@ -9,6 +9,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const imageEl = document.getElementById("pictures-image");
   const prevBtn = document.getElementById("pictures-prev");
   const nextBtn = document.getElementById("pictures-next");
+  const expandBtn = document.getElementById("pictures-expand");
   const thumbsEl = document.getElementById("pictures-thumbs");
 
   let pages = [];
@@ -31,12 +32,34 @@ document.addEventListener("DOMContentLoaded", () => {
     });
     const active = thumbsEl.querySelector(".thumb-item.active");
     if (active) active.scrollIntoView({ inline: "center", block: "nearest", behavior: "smooth" });
+
+    if (window.StoryvoiceZoomStage && window.StoryvoiceZoomStage.isOpen()) {
+      window.StoryvoiceZoomStage.update({
+        imageUrl: page.image_url,
+        alt: imageEl.alt,
+        hasPrev: currentIndex > 0,
+        hasNext: currentIndex < pages.length - 1,
+      });
+    }
   }
 
   function goTo(idx) {
     if (idx < 0 || idx >= pages.length) return;
     currentIndex = idx;
     render();
+  }
+
+  function openExpanded() {
+    const page = pages[currentIndex];
+    if (!page || !window.StoryvoiceZoomStage) return;
+    window.StoryvoiceZoomStage.open({
+      imageUrl: page.image_url,
+      alt: imageEl.alt,
+      hasPrev: currentIndex > 0,
+      hasNext: currentIndex < pages.length - 1,
+      onPrev: () => goTo(currentIndex - 1),
+      onNext: () => goTo(currentIndex + 1),
+    });
   }
 
   function buildThumbs() {
@@ -64,6 +87,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
   prevBtn.addEventListener("click", () => goTo(currentIndex - 1));
   nextBtn.addEventListener("click", () => goTo(currentIndex + 1));
+  expandBtn.addEventListener("click", openExpanded);
+  imageEl.addEventListener("click", openExpanded);
 
   fetch(`/books/${bookId}/pictures/data`)
     .then((res) => res.json())

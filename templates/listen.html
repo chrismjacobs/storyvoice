@@ -4,6 +4,7 @@
 
 {% block head %}
 <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+<script src="{{ url_for('static', filename='js/zoom-stage.js') }}" defer></script>
 <script src="{{ url_for('static', filename='js/viewer.js') }}" defer></script>
 {% endblock %}
 
