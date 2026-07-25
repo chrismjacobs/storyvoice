@@ -61,7 +61,15 @@
         <li class="narration-row">
           <span>{{ narration.display_title() }}</span>
           <span class="narration-progress">{{ entry.done }}/{{ entry.total }} pages</span>
-          <span class="narration-visibility">{{ narration.visibility }}</span>
+          {% if narration.user_id == current_user.id %}
+            <select class="visibility-select" data-narration-id="{{ narration.id }}" data-current="{{ narration.visibility }}">
+              {% for choice in narration.VISIBILITY_CHOICES %}
+                <option value="{{ choice }}" {% if choice == narration.visibility %}selected{% endif %}>{{ choice }}</option>
+              {% endfor %}
+            </select>
+          {% else %}
+            <span class="narration-visibility">{{ narration.visibility }}</span>
+          {% endif %}
           <a href="{{ url_for('narrations.listen', narration_id=narration.id) }}">Listen</a>
           {% if narration.user_id == current_user.id %}
             <a href="{{ url_for('narrations.record', narration_id=narration.id) }}">Continue recording</a>
@@ -81,4 +89,32 @@
     <button type="submit">Start recording</button>
   </form>
 </section>
+
+<script>
+  document.querySelectorAll(".visibility-select").forEach((select) => {
+    select.addEventListener("change", () => {
+      const narrationId = select.dataset.narrationId;
+      const visibility = select.value;
+      const previous = select.dataset.current || visibility;
+      select.disabled = true;
+
+      fetch(`/narrations/${narrationId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ visibility }),
+      })
+        .then((res) => {
+          if (!res.ok) throw new Error("update failed");
+          select.dataset.current = visibility;
+        })
+        .catch(() => {
+          select.value = previous;
+          alert("Could not update visibility — try again.");
+        })
+        .finally(() => {
+          select.disabled = false;
+        });
+    });
+  });
+</script>
 {% endblock %}

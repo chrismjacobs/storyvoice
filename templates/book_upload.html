@@ -8,7 +8,7 @@
       <input type="file" name="pdf" accept="application/pdf" required autofocus>
     </label>
     <label>Title (optional — defaults to the file name)
-      <input type="text" name="title" placeholder="e.g. Anzu the Great Kaiju">
+      <input type="text" name="title" placeholder="Upload pdf first to auto fill">
     </label>
     <label>Language
       <select name="language" required>
@@ -35,6 +35,31 @@
       form.querySelector("#upload-status").hidden = false;
       return true;
     }
+
+    // Mirrors the server-side fallback in _title_from_filename() so what the
+    // user sees before submitting matches what they'd get by leaving it
+    // blank. Only overwrites the field while it still holds a value we
+    // auto-filled -- once the user types their own title, further file
+    // changes stop touching it.
+    (function () {
+      const pdfInput = document.querySelector('input[name="pdf"]');
+      const titleInput = document.querySelector('input[name="title"]');
+      let autoFilled = "";
+
+      function titleFromFilename(filename) {
+        const stem = filename.replace(/\.[^./\\]+$/, "");
+        return stem.replace(/[_-]+/g, " ").replace(/\s+/g, " ").trim();
+      }
+
+      pdfInput.addEventListener("change", () => {
+        const file = pdfInput.files[0];
+        if (!file) return;
+        if (titleInput.value === "" || titleInput.value === autoFilled) {
+          autoFilled = titleFromFilename(file.name);
+          titleInput.value = autoFilled;
+        }
+      });
+    })();
   </script>
 </div>
 {% endblock %}
